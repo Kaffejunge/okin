@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heinchem"
+version = "0.1.0"
+description = "A collection of chemistry-related Python tools"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+  {name = "Finn Bork", email = "finn.bork@gmx.de"}
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "mendeleev",
+  "scipy",
+  "pandas",
+  "scikit-learn",
+  "tellurium",
+  "sympy"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["heinchem*"]

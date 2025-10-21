@@ -1,0 +1,19 @@
+J1: A + cat -> cat1;		k1*A*cat-kN1*cat1
+J2: B + cat1 -> P + cat;		k2*B*cat1-kN2*P*cat
+J3: A + cat -> catI;		k3*A*cat-kN3*catI
+
+
+A = 0
+B = 0
+P = 0
+cat = 0
+cat1 = 0
+catI = 0
+
+
+k1 = 49941
+kN1 = 79097
+k2 = 74286
+kN2 = 16290
+k3 = 31655
+kN3 = 49340
