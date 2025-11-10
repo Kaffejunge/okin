@@ -1,93 +1,176 @@
-# chem_model
+# OKIN
 
+Organic Kinetics is a package to perform tasks useful for understanding kinetic behaviour in organic chemistry.
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/heingroup/chem_model.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.com/heingroup/chem_model/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+From PyPI:
+
+```bash
+pip install okin
+```
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### 1. ChemDraw Parser
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Parse reactions/mechanistic cycles directly from ChemDraw `.cdxml` files, allowing you to extract and work with reaction information.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+**Example:**
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```python
+from okin.cd_parser.cd_parser import CDParser
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+# Load a ChemDraw file
+cd_parser = CDParser(file_path="base_cycle.cdxml", draw=True)
+
+# Extract all reactions
+reactions = cd_parser.find_reactions()
+print(f"Reactions found in {cd_parser.file_path}:")
+for rct in reactions:
+    print(rct)
+```
+- `file_path`: Path to your ChemDraw `.cdxml` file.  
+- `draw=True`: Optionally renders the Chemdraw File with the bounding boxes. These determine which parts to treat as one reaction or a new one.
+- `find_reactions()`: Returns a list of reaction objects parsed from the file, which can be used for other functions of this package (simulation, VTNA, or modeling).
+
+
+
+### 2. Rate Equations
+
+Calculate the *Steady-State* rate equation for a given mechanism.
+
+**Example:**
+
+```python
+from okin.simulation.rate_equation import RateEquation
+
+# Define reactions (reversible or irreversible)
+reactions = ["A + cat <==> cat1", "cat1 + B -> cat + P", "B + cat -> cat_I"]
+rate_eq = RateEquation(reactions)
+
+# Display LaTeX rate law
+print(rate_eq.debug_string)
+rate_eq.show_latex_rate_law()
+
+```
+- The used catalytic species need to be named `cat` for base catalyst and `cat<nr>` e.g. `cat1` for all intermediates. Deactivated cat needs to be named `catI`.
+- Reversible reactions should use `<==>`; irreversible reactions use `->`.  
+- `show_latex_rate_law()` renders the final rate law in LaTeX format. If latex is not available it prints the LaTeX string.
+- `rate_eq.debug_string` shows the math that has been performed
+
+
+### 3. Simulation
+
+Okin allows you to simulate chemical reaction kinetics over time with specified rate constants and initial concentrations.
+
+**Example:**
+
+```python
+from okin.simulation.simulator import Simulator
+import matplotlib.pyplot as plt
+from okin.base.chem_plot_utils import apply_acs_layout
+
+# Define reactions, rate constants, and initial concentrations
+reactions = ["A + cat -> cat1", "cat1 + B -> cat + P", "X + cat -> cat_deact"]
+k_dict = {"k1": 10, "kN1": 5, "k2": 3, "kN2": 0, "k3": 0.005, "kN3": 0}
+c_dict = {"A": 1.0, "B": 1.2, "cat": 0.05, "P": 0.0, "X": 0.1}
+
+# Setup and run simulation
+sim = Simulator()
+sim.setup(reactions, k_dict, c_dict)
+sim.simulate(start=0, stop=80, nr_time_points=40)
+
+# Access results
+df = sim.result
+
+# Plot results
+plt.scatter(df["time"], df["A"])
+plt.scatter(df["time"], df["B"])
+plt.scatter(df["time"], df["P"])
+plt.xlabel("time")
+plt.ylabel("concentration")
+apply_acs_layout()
+plt.show()
+```
+
+- `setup()` takes reactions as strings, rate constants (`k_dict`), and initial concentrations (`c_dict`).  
+- `simulate()` runs the time evolution over a specified range with a given number of points.  
+- Results are stored in `sim.result` as a DataFrame for plotting or further analysis.
+- Reversibility is determined by k-values and not by arrows.
+
+### 4. VTNA (Variable Time Normalization Analysis)
+
+Determine reaction orders via VTNA (https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc04698k).
+
+**Example:**
+
+```python
+from okin.kinetics.vtna import ClassicVTNA
+
+# Assuming df1 and df2 are results from two simulations or experiments
+vtna = ClassicVTNA(df_rct1=df1, df_rct2=df2, species_col_name="cat", product_col_name="P", time_col_name="time")
+
+# Best kinetic order for the species
+print(f"Best order for cat: {vtna.best_order}")
+
+# Plot normalized VTNA data
+vtna.show_plot()
+```
+
+- `df_rct1`, `df_rct2`: DataFrames containing time-course data for two experiments that only vary in one concentration.  
+- `species_col_name`: Name of the species for which the initial concentration was changed. Same name as the provided data.
+- `product_col_name`: Name of the column used to track reaction progress. Same name as the provided data.
+- `time_col_name`: Name of the time column.  Same name as the provided data.
+- `show_plot()`: Visualizes the normalized reaction rates for comparison.
+
+
+### 5. Modeling with COPASI
+
+Okin integrates with COPASI (https://copasi.org/) to build and fit kinetic models from experimental data.
+
+**Example:**
+
+```python
+from okin.model.modler import Modler
+
+# Initialize Modler with local COPASI path
+modler = Modler(copasi_path=r"D:\python_code\hein_modules\local_copasi")
+
+# Set reaction mechanism
+reactions = ["A + cat -> cat1", "cat1 + B -> cat + P", "X + cat -> cat_I"]
+modler.set_m_reactions(reactions)
+
+# Add experimental CSV data
+modler.add_experiment_csv(["data1.csv","data2.csv"])
+
+# Specify species for model fitting
+modler.set_species_for_model(["P","A"])
+modler.set_species_to_match(["P","A","B"])
+
+# Configure COPASI optimization settings
+modler.set_copasi_settings({"number_of_generations":50,"population_size":50})
+
+# Create and fit the model
+modler.create_single_model()
+modler.show_model_fit(save_modeled_data=True, show_all=True)
+```
+
+- `copasi_path`: Path to the local COPASI folder (LINK WILL BE ADDED SOON)  
+- `reactions`: List of reactions defining the mechanism.
+- `experiment CSV files`: Paths to one or more CSV files with experimental data  .
+- `species_for_model`: Species used for internal error calculations. 
+- `species_to_match`: Species used by COPASI to fit the model.
+- `copasi_settings`: Dictionary of COPASI optimization parameters  
+- `create_single_model()`: Runs COPASI. 
+- `show_model_fit()`: Displays the fitted model and optionally saves modeled data.
+
 
 ## License
-For open source projects, say how it is licensed.
+This project is licensed under the MIT License.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+## Future
+This project will receive updates in the near future.
+
