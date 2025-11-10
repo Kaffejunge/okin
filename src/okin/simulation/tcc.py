@@ -165,14 +165,13 @@ class TimeCourseCreator():
         df_noisy["cat"] = df["cat"]
         return df_noisy
 
-    def find_end_time(self, m, k_dict, c_dict, return_df=False, t_stop_guess=None):
+    def find_end_time(self, c_dict, m, k_dict, return_df=False, t_stop_guess=None, sb_string=None, conv_thresh=0.005):
         #* setup variables for endpoint determination simulation
         num_data_points = 50
 
         # Find the limiting reagent, ignoring the specified keys
         
         limiting_reagent = min((c for c in c_dict if c not in self.NON_LIMITING_CHEMS), key=lambda c: c_dict[c])
-        print(f"{limiting_reagent = }")
         
         sim = Simulator() # new simulator obj that is used for this end time determination
         error_tuple = (None, None, None) # returned when no convergence can be found
@@ -190,20 +189,23 @@ class TimeCourseCreator():
                 return error_tuple
                 
             # if no convergence after 20 iterations: error
-            if i > 50:
+            if i > 20:
                 return error_tuple
             
             print(f"\n____________{i = }, {t_stop = }_____________")
             
             sim.setup(reactions=m, k_dict=k_dict, c_dict=c_dict)
-            sim.simulate(0, t_stop, num_data_points, use_const_cat=False, selections=list(c_dict.keys()) + ["time"])
+
+
+            sim.simulate(0, t_stop, num_data_points, use_const_cat=False, selections=list(c_dict.keys()) + ["time"], sb_string=sb_string)
+
 
             if sim.result["P"].max() <= 0:
                 continue
 
             # check for convergance
             norm_result = self.normalize_for_limiting_reagent(sim.result, limiting_reagent=limiting_reagent)
-            is_converged, conv_index, nr_conv_points = self.check_convergence(norm_result["P"])
+            is_converged, conv_index, nr_conv_points = self.check_convergence(norm_result["P"], conv_thresh=conv_thresh)
             yield_ = round(norm_result["P"].max(), 2)
 
             if is_converged:
@@ -214,8 +216,12 @@ class TimeCourseCreator():
                     return error_tuple
                 
                 if return_df:
+                    
                     sim.setup(reactions=m, k_dict=k_dict, c_dict=c_dict)
-                    sim.simulate(0, true_t_stop, num_data_points, use_const_cat=False, selections=["time"] + list(c_dict.keys()))
+
+
+                    sim.simulate(0, t_stop, num_data_points, use_const_cat=False, selections=list(c_dict.keys()) + ["time"], sb_string=sb_string)
+
 
                     final_df = self.apply_noise(sim.result.copy())
                     
@@ -432,7 +438,7 @@ class TimeCourseCreator():
         norm_df["time"] = df["time"].copy()
         return norm_df
 
-    def check_convergence(self, p_series):
+    def check_convergence(self, p_series, conv_thresh=0.005):
         # Calculate the differences between consecutive product values in the pd.Series
         diffs = p_series.diff().abs()
         # dd = diffs.diff()
@@ -441,7 +447,7 @@ class TimeCourseCreator():
         # dd = dd / dd.max()
         
         last_d_avg = abs(diffs.tail(self.NR_CONV_POINTS).mean())
-        converged = last_d_avg < 0.005
+        converged = last_d_avg < conv_thresh
         conv_p_val = p_series.iloc[-1] * 0.995 # 1% of max P value
         conv_index = (p_series - conv_p_val).abs().idxmin() + self.TRAILING_POINTS
 

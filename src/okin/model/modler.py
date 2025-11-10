@@ -1,5 +1,5 @@
 from okin.base.reaction import TEReaction
-from okin.cd_reader.cd_parser import CDParser
+from okin.cd_parser.cd_parser import CDParser
 from okin.base.chem_logger import chem_logger
 from okin.simulation.simulator import Simulator
 from okin.base.chem_plot_utils import apply_acs_layout
@@ -33,7 +33,6 @@ class Modler():
     self.copasi_settings is one large dict with all default values used in COPASI modeling
     self.parameters is a dict(dict) with keys being the parameters to be optimized {"k1": {"bounds": (lower_bound, upper_bound), "definition": kN2*5, "best_guess": value}}
 
-    self.initial_guess is the initially given mechanism as a list(str) or chemdraw file.
     self.current_mechanism is an updated mechanism that is going to be modeled next.
     self.current_results is a dict of all parameters that are to be optimized together with their final optimization value.
     self.current_error is the error of the current mechanistic guess after optimizing / modeling.
@@ -44,8 +43,10 @@ class Modler():
     self.history is a list(dict) of all previously modeled mechanisms [{"mechanism": self.current_mechanism, "results": self.current_results}, "error": self.current_error]
     """
 
-    def __init__(self):
+    def __init__(self, copasi_path):
         self.logger = chem_logger.getChild(self.__class__.__name__)
+        self.COPASI_PATH = copasi_path
+
         self.to_plot = None
         
         # COPASI setup
@@ -56,7 +57,6 @@ class Modler():
         self.fixed_k_dict = {}
 
         # Basic mechanism setup
-        self.initial_guess = None
         self.current_mechanism = None
         self.current_results = {}
         self.current_error = None
@@ -76,11 +76,11 @@ class Modler():
         self.simulator = Simulator()
 
     def create_paths(self):
-        current_folder = f"{os.path.dirname(os.path.abspath(__file__))}" # this is nuts.
-        self.COPASI_PATH = f"{current_folder}\\local_copasi"
+        # current_folder = f"{os.path.dirname(os.path.abspath(__file__))}" # this is nuts.
+        # self.COPASI_PATH = f"{current_folder}\\local_copasi"
         self.COPASI_BASE_PATH = f"{self.COPASI_PATH}\\temp"
         self.COPASI_INPUT_PATH = f"{self.COPASI_PATH}\\temp\\input"
-        self.COPASI_OUTPUT_PATH = f"{self.COPASI_PATH}\\temp\\fitting\\Fit1\\results\\optimization" # copasi demands this structure
+        self.COPASI_OUTPUT_PATH = f"{self.COPASI_PATH}\\temp\\kopt\\Fit1\\results\\curr_run" # copasi demands this structure
         self.COPASI_DEFAULT_PATH = f"{self.COPASI_PATH}\\default"      
         
         self.logger.info(f"{self.COPASI_INPUT_PATH = }")
@@ -90,50 +90,49 @@ class Modler():
 
     def _get_copasi_settings(self):
         copasi_settings = {
-                "problem": "fitting",
-                "results_directory": "optimization",
-                "report_name": "results",
-
-                "method": "genetic_algorithm",
-                "weight_method": "value_scaling",
-                "randomize_start_values": True,
-                "number_of_generations": "1",
-                "population_size": "1",
-                "tolerance": 1e-05,
-                "copy_number": 3,
-                "pe_number": 10,
-                "run_mode": "parallel",
-                "calculate_statistics": False,
-                "config_filename": "config.yml",
-                "context": "s",
-                "cooling_factor": 0.85,
-                "create_parameter_sets": False,
-                "cross_validation_depth": 1,
-                "fit": 1,
-                "iteration_limit": 50,
-                "number_of_iterations": 100000,
-                "overwrite_config_file": False,
-                "pf": 0.475,
-                "pl_lower_bound": 1000,
-                "pl_upper_bound": 1000,
-                "prefix": None,
-                "quantity_type": "concentration",
-                "random_number_generator": 1,
-                "rho": 0.2,
-                "save": False,
-                "scale": 10,
-                "seed": 0,
-                "start_temperature": 1,
-                "start_value": 0.1,
-                "std_deviation": 1e-06,
-                "swarm_size": 50,
-                "update_model": False,
-                "lower_bound": 1e-05,
-                "upper_bound": 1e7,
-                "use_config_start_values": False,
-                "validation_threshold": 5,
-                "validation_weight": 1
-            }
+            "problem": "kopt",
+            "results_directory": "curr_run",
+            "report_name": "k_values",
+            "method": "genetic_algorithm",
+            "weight_method": "mean_squared",
+            "randomize_start_values": True,
+            "number_of_generations": "10",
+            "population_size": "10",
+            "tolerance": 1e-05,
+            "copy_number": 3,
+            "pe_number": 10,
+            "run_mode": "parallel",
+            "calculate_statistics": False,
+            "config_filename": "config.yml",
+            "context": "s",
+            "cooling_factor": 0.85,
+            "create_parameter_sets": False,
+            "cross_validation_depth": 1,
+            "fit": 1,
+            "iteration_limit": 50,
+            "lower_bound": 1e-06,
+            "number_of_iterations": 100000,
+            "overwrite_config_file": False,
+            "pf": 0.475,
+            "pl_lower_bound": 1000,
+            "pl_upper_bound": 1000,
+            "prefix": None,
+            "quantity_type": "concentration",
+            "random_number_generator": 1,
+            "rho": 0.2,
+            "save": False,
+            "scale": 10,
+            "seed": 0,
+            "start_temperature": 1,
+            "start_value": 0.1,
+            "std_deviation": 1e-06,
+            "swarm_size": 50,
+            "update_model": False,
+            "upper_bound": 1000000,
+            "use_config_start_values": False,
+            "validation_threshold": 5,
+            "validation_weight": 1
+        }
         return copasi_settings
     
     def _clear_copasi_inputs(self):
@@ -203,28 +202,36 @@ class Modler():
         fit_item_path = os.path.join(self.COPASI_INPUT_PATH, "fit_items.txt")
         # fitting items, fitting_items
 
-        k_to_fit = {k_name: {} for k_name in k_dict.keys() if not "$" in k_dict[k_name]}
+        # k_to_fit = {k_name: {} for k_name in k_dict.keys() if "$" not in k_dict[k_name]}
+        k_to_fit = [k_name for k_name in k_dict.keys() if "$" not in k_dict[k_name]]
 
-        for k,d in self.k_boundaries.items():
-            if k in k_to_fit.keys():
-                k_to_fit[k] = d
+        # for k,d in self.k_boundaries.items():
+        #     if k in k_to_fit.keys():
+        #         k_to_fit[k] = d
 
-            else:
-                raise IndexError(f"{k = } was given boundaries but is not to be fitted.")
+        #     else:
+        #         raise IndexError(f"{k = } was given boundaries but is not to be fitted.")
         
-        # self.logger.info(f"{k_to_fit=}")
+        self.logger.info(f"{k_to_fit=}")
 
         with open(fit_item_path, "w") as fif:
             fif.write(str(k_to_fit))
 
         # sb string setup
         sb_string = self.simulator._get_antimony_str(reactions=self.current_mechanism, k_dict=k_dict, c_dict={})
-        print(sb_string)
         sb_string_path = os.path.join(self.COPASI_INPUT_PATH, "sb_string.txt")
+
+
+        #! this is intentionally stupid
+        with open(r"D:\python_code\hein_modules\hein_chem_apply\fix_re_add_model\sb_string_true.txt", "r") as f:
+            sb_string = f.read()
+
+
         with open(sb_string_path, "w") as sbf:
             # print(f"COPASI from Sb string:\n{self.sb_string}")
             sbf.write(sb_string)
 
+        
     def _write_copasi_settings(self):
         curr_settings_path = os.path.join(self.COPASI_INPUT_PATH, "user_settings.txt")
         # self.logger.info(f"Settings file = {curr_settings_path}")
@@ -289,11 +296,6 @@ class Modler():
         self.logger.info(f"Set models to:")
         for name, m in self.models.items():
             self.logger.info(f"{name}: {m}")
-
-    def set_initial_guess(self, mechanism=None, cdxml_path=None):
-        # This also sets a mechanism but stores it in a different variable to use later in the process.
-        self.set_m_reactions(mechanism=mechanism, cdxml_path=cdxml_path)
-        self.initial_guess = self.current_mechanism.copy()
 
     def set_m_reactions(self, mechanism=None, cdxml_path=None):
         # m = mechanism. but its no k values so m_reactions
@@ -539,7 +541,7 @@ for name, m in mechanisms.items():
 
         self._start_copasi()
 
-    def get_current_model_results(self):
+    def get_current_model_results(self, file_index=0):
         mod_res_df = self._read_results()
         best = mod_res_df.iloc[0].to_dict()
         
@@ -553,7 +555,7 @@ for name, m in mechanisms.items():
         k_dict = {k:v for k,v in best.items() if k.startswith("k")}
 
         # get true data
-        first_file_path = list(self.df_dict.keys())[0]
+        first_file_path = list(self.df_dict.keys())[file_index]
         self.logger.info(f"{first_file_path = }")
         true_df = pd.read_csv(first_file_path)
 
@@ -562,49 +564,60 @@ for name, m in mechanisms.items():
 
         return k_dict, c_dict, true_df
 
-    def show_model_fit(self):
+    def show_model_fit(self, show_all=False, save_modeled_data=False):
         k_dict, c_dict, true_df = self.get_current_model_results()
-        print(f"{k_dict = }\n{c_dict = }\n{true_df = }")
+        # print(f"{k_dict = }\n{c_dict = }\n{true_df = }")
 
-        self.simulator.setup(reactions=self.current_mechanism, k_dict=k_dict, c_dict=c_dict)
-        self.simulator.simulate(times=true_df["time"].tolist())
-        sim_df = self.simulator.result
+        
         
         # self._custom_error(true_df, sim_df)
 
-        for s in self.to_plot:
-            plt.scatter(true_df["time"], true_df[s], label=s)
-            plt.plot(sim_df["time"], sim_df[s], linestyle=":", marker="*", markersize=5)
+        if show_all:
+            for i in range(len(self.df_dict)):
+                csv_path = list(self.df_dict.keys())[i]
+                csv_name = csv_path.split("\\")[-1]
+
+                k_dict, c_dict, true_df = self.get_current_model_results(file_index=i)
+
+                for s in self.to_plot:
+                    self.simulator.setup(reactions=self.current_mechanism, k_dict=k_dict, c_dict=c_dict)
+                    self.simulator.simulate(times=true_df["time"].tolist())
+                    sim_df = self.simulator.result
+                    plt.scatter(true_df["time"], true_df[s], label=f"True {s}")
+                    plt.plot(sim_df["time"], sim_df[s], linestyle=":", marker="*", markersize=5, label=f"Model {s}")
+
+                if save_modeled_data:
+                    new_csv_name = f"{csv_path[:-4]}_modeled.csv"
+                    sim_df.to_csv(new_csv_name, index=False)
+                    self.logger.info(f"Saved file to {new_csv_name}")
+
+                plt.title(csv_name)
+                apply_acs_layout()
+                plt.show()
+
+                
+        else:
+            csv_path = list(self.df_dict.keys())[0] # always first file
+            csv_name = csv_path.split("\\")[-1]
+
+            for s in self.to_plot:
+                self.simulator.setup(reactions=self.current_mechanism, k_dict=k_dict, c_dict=c_dict)
+                self.simulator.simulate(times=true_df["time"].tolist())
+                sim_df = self.simulator.result
+                plt.scatter(true_df["time"], true_df[s], label=f"True {s}")
+                plt.plot(sim_df["time"], sim_df[s], linestyle=":", marker="*", markersize=5, label=f"Model {s}")
+            
+            if save_modeled_data:
+                new_csv_name = f"{csv_path[:-4]}_modeled.csv"
+                sim_df.to_csv(new_csv_name, index=False)
+                self.logger.info(f"Saved file to {new_csv_name}")
+            apply_acs_layout()
+            plt.show()
+
+
+
         
-        apply_acs_layout()
-        plt.show()
-
-    def find_outlier_dfs(self):
-        """
-        Checks if leaving out a single file makes a significantly better fit.
-
-        find_outlier_dfs:
-            - check for mean error differences
-            - if a file is seen as an outlier model without that file.
-            - compare results
-        """
-
-    def get_next_condition(self):
-        """
-        Suggest the next set of concentrations to run.
-        - if bad match with new mechanism in simulation use that for max info
-        """
-    
-    def elucidate_model(self, do_basic_model_improvement=False, suggest_next_run=False,  find_outlier_dfs=False):
-        """
-        Uses <self.df_dict> to fit the data to the <self.mechanistic_guess>
-
-            - add catalyst activation/deactivation
-            - model with new steps
-            - compare results
-        """
-        # get csv files
-        pass
+        
     
     def find_next_best_experiment(self, initial_c_dict:dict, bounds:list, method:str ="optimization", grid_sizes:dict = None):
         # bounds: list[tuple]
@@ -619,7 +632,6 @@ for name, m in mechanisms.items():
         self.logs = {}
         self.i = 0
         self.new_conditions = {"c_dict": None, "error": 1}
-        print(f"{bounds = }, {type(bounds) = }")
         # Minimize the negative of the function to maximize it
 
         if method == "optimization":
@@ -646,8 +658,6 @@ for name, m in mechanisms.items():
         plt.title(f"{self.new_conditions['c_dict']}")
         self.display_models(self.new_conditions["c_dict"])
         max_value = result.fun  # Since we minimized the negative, negate the result
-        print(f"{max_value = }")
-        print(f"{self.new_conditions = }")
 
         with open("max_mse.json", "w") as f:
             json.dump(self.max_mse_c_values, f, indent=4)
@@ -657,27 +667,21 @@ for name, m in mechanisms.items():
     def grid_search(self, dict_bounds, grid_sizes):
         species_names = list(grid_sizes.keys())
         grid_ranges = {species: np.round(np.arange(dict_bounds[species][0], dict_bounds[species][1], grid_sizes[species]), 3) for species in species_names}
-        print(grid_ranges)
         all_combinations = list(product(*grid_ranges.values()))
-       
-        print(f"{grid_ranges = }, {dict_bounds = }")
-        # for comb in all_combinations:
-        #     print(comb)
 
-        print(len(all_combinations))
         import time
 
         start = time.perf_counter()
         i = 0
         for combination in all_combinations:
             i += 1
-            print(f"{i}/{len(all_combinations)}") # i/729
+            self.logger.info(f"{i}/{len(all_combinations)}") # i/729
 
             self.get_model_mse(c_dict_vals=combination)
             # c_dict = {species: conc for species, conc in zip(species_names, combination)}
             # df, limiting_reagent, true_t_stop, yield_ = tcc.find_end_time(m=rcts, c_dict=c_dict, k_dict=k_dict, return_df=True, t_stop=128)
 
-        print(f"\n________________\nIt took {time.perf_counter() - start} seconds\n________________________")
+        self.logger.info(f"\n________________\nIt took {time.perf_counter() - start} seconds\n________________________")
         # import sys
         # sys.exit()
       
@@ -697,8 +701,7 @@ for name, m in mechanisms.items():
             names.append(name)
             k_dict = model["k_dict"]
             rcts = model["reactions"]
-            
-            print(f"{c_dict = }")
+
             df, limiting_reagent, true_t_stop, yield_ = tcc.find_end_time(m=rcts, c_dict=c_dict, k_dict=k_dict, return_df=True)
             # Find the largest starting value (max of the first row)
             max_start_value = df.iloc[0].max()
@@ -731,10 +734,8 @@ for name, m in mechanisms.items():
 
                     key = f"{name1} vs {name2} ({species_name})"
                     if key not in self.max_mse_c_values.keys():
-                        print(f"added {key = }")
                         self.max_mse_c_values[key] = {"c_dict": None, "mse": -1}
                         
-                    
                     # Ensure the species column exists in both DataFrames
                     if species_name in df1.columns and species_name in df2.columns:
                         # Compare the columns for similarity
@@ -762,7 +763,7 @@ for name, m in mechanisms.items():
         if error < self.new_conditions["error"]:
             print(f"New BEST of {error} with {c_dict = }")
             self.new_conditions = {"c_dict": c_dict, "error": error}
-        print(f"Calculated {error = }; {c_dict = }")
+        self.logger.info(f"Calculated {error = }; {c_dict = }")
         
         # self.display_models(c_dict)
         self.logs[self.i] = {"c_dict": c_dict, "mse": error}
@@ -833,53 +834,73 @@ if __name__ == "__main__":
 
     # _______________________________________________________________________________________
 
-
-    m = Modler()
-
+    m = Modler(copasi_path=r"D:\python_code\hein_modules\local_copasi")
 
 
-    mechanisms = {
-    "M1":
-        {
-        "A + cat -> cat1": {"k1":0.3, "kN1":0.05},
-        "cat1 + B -> P + cat": {"k2":100, "kN2":0},
-        "A + cat -> catI": {"k3":0.05, "kN3":0}
-        },
+    rcts = [
+        "A + cat -> cat1",
+        "cat1 + B -> P + cat",
+        "P + cat -> cat2"
+        ]
 
-    "M2":
-        {
-        "A + cat -> cat1": {"k1":0.3, "kN1":0.05},
-        "cat1 + B -> P + cat": {"k2":100, "kN2":0},
-        "P + cat -> catI": {"k3":0.05, "kN3":0}
-        },
-    "M3":
-        {
-        "A + cat -> cat1": {"k1":0.3, "kN1":0.05},
-        "cat1 + B -> P + cat": {"k2":100, "kN2":0},
-        "cat -> catI": {"k3":0.05, "kN3":0}
-        }
-    }
-
-    # from modeling the mechansims wtih the data
-    k_dict_M1 = {'k1': 0.67282, 'kN1': 0.000232981, 'k2': 0.273698, 'k3': 0.0978742, 'kN3': 1e-05, 'kN2': 0}
-    k_dict_M2 = {'k1': 1.04382, 'kN1': 0.000789731, 'k2': 0.135528, 'k3': 0.211901, 'kN3': 6.94133e-05, 'kN2': 0}
-    k_dict_M3 = {'k1': 975.566, 'kN1': 1.87212e-05, 'k2': 0.128818, 'k3': 43.2637, 'kN3': 1.55055e-05, 'kN2': 0}
-
-    models = {
-        "M1": {"reactions": list(mechanisms["M1"].keys()), "k_dict": k_dict_M1},
-        "M2": {"reactions": list(mechanisms["M2"].keys()), "k_dict": k_dict_M2},
-        "M3": {"reactions": list(mechanisms["M3"].keys()), "k_dict": k_dict_M3},
-    }
-
-
-    m.set_models(models=models)
+    # df = pd.read_csv(r"D:\python_code\hein_modules\hein_chem_apply\fix_re_add_model\re_add_data.csv")
+    # print(df)
+    # input()
+    # m.set_models(models=models)
+    m.set_m_reactions(mechanism=rcts)
+    m.add_experiment_csv(csv_paths=[r"D:\python_code\hein_modules\hein_chem_apply\fix_re_add_model\re_add_data.csv"])
     m.set_species_for_model(species=["P", "A"])
+    m.set_species_to_match(species=["P", "A", "B"])
+    # m.set_manual_sb_edit(manual_sb_edit=True)
+    m.create_single_model()
 
-    c_dict = {"A": 0.5, "B": 0.8, "cat": 0.05, "P": 0.0}
+    m.show_model_fit(save_modeled_data=True, show_all=True)
 
-    bounds = {"A": (0.3, 1.01), "B": (0.3, 1.01), "cat": (0.01, 0.101), "P": (0.0, 1.01)}
 
-    m.find_next_best_experiment(initial_c_dict=c_dict, bounds=bounds, method="optimization", grid_sizes={"A": 0.1, "B": 0.1, "cat": 0.01, "P": 0.1})
+
+    # m = Modler()
+    # mechanisms = {
+    # "M1":
+    #     {
+    #     "A + cat -> cat1": {"k1":0.3, "kN1":0.05},
+    #     "cat1 + B -> P + cat": {"k2":100, "kN2":0},
+    #     "A + cat -> catI": {"k3":0.05, "kN3":0}
+    #     },
+
+    # "M2":
+    #     {
+    #     "A + cat -> cat1": {"k1":0.3, "kN1":0.05},
+    #     "cat1 + B -> P + cat": {"k2":100, "kN2":0},
+    #     "P + cat -> catI": {"k3":0.05, "kN3":0}
+    #     },
+    # "M3":
+    #     {
+    #     "A + cat -> cat1": {"k1":0.3, "kN1":0.05},
+    #     "cat1 + B -> P + cat": {"k2":100, "kN2":0},
+    #     "cat -> catI": {"k3":0.05, "kN3":0}
+    #     }
+    # }
+
+    # # from modeling the mechansims wtih the data
+    # k_dict_M1 = {'k1': 0.67282, 'kN1': 0.000232981, 'k2': 0.273698, 'k3': 0.0978742, 'kN3': 1e-05, 'kN2': 0}
+    # k_dict_M2 = {'k1': 1.04382, 'kN1': 0.000789731, 'k2': 0.135528, 'k3': 0.211901, 'kN3': 6.94133e-05, 'kN2': 0}
+    # k_dict_M3 = {'k1': 975.566, 'kN1': 1.87212e-05, 'k2': 0.128818, 'k3': 43.2637, 'kN3': 1.55055e-05, 'kN2': 0}
+
+    # models = {
+    #     "M1": {"reactions": list(mechanisms["M1"].keys()), "k_dict": k_dict_M1},
+    #     "M2": {"reactions": list(mechanisms["M2"].keys()), "k_dict": k_dict_M2},
+    #     "M3": {"reactions": list(mechanisms["M3"].keys()), "k_dict": k_dict_M3},
+    # }
+
+
+    # m.set_models(models=models)
+    # m.set_species_for_model(species=["P", "A"])
+
+    # c_dict = {"A": 0.5, "B": 0.8, "cat": 0.05, "P": 0.0}
+
+    # bounds = {"A": (0.3, 1.01), "B": (0.3, 1.01), "cat": (0.01, 0.101), "P": (0.0, 1.01)}
+
+    # m.find_next_best_experiment(initial_c_dict=c_dict, bounds=bounds, method="optimization", grid_sizes={"A": 0.1, "B": 0.1, "cat": 0.01, "P": 0.1})
     # m.display_models(c_dict={"A": 1.0, "B": 0.8, "cat": 0.05, "P":0})
 
     # 477.17 seconds for 729 ~= 0.65 seconds per iteration
