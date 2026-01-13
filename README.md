@@ -1,18 +1,23 @@
 # OKIN
 
-Organic Kinetics is a package to perform tasks useful for understanding kinetic behaviour in organic chemistry.
-
+Organic Kinetics is a package to perform tasks useful for understanding kinetic behaviour in organic chemistry.<br/>
+Requires python >= 3.9 unless CMake is available then python >=3.8.
 
 ## Installation
 
 From PyPI:
+### Base package
+- Create and activate a dedicated environment
+- `pip install re_add_modeler`
 
-```bash
-pip install okin
-```
+### With Modeling
+- make sure COPASI is installed (https://copasi.org/Download/)
+- download and unzip 'python implementation of COPASI':
+https://drive.google.com/file/d/1cVNLU4SBsz0JhC48MO69wVSLH-RpyIt6/view?usp=sharing
+- OR clone github repo of 'python implementation of COPASI' `https://gitlab.com/heingroup/py_copasi`
+- The modeling class requires the path to that folder as an argument `modler = Modler(copasi_path=local_copasi_path)`
 
 ## Usage
-
 
 ### 1. ChemDraw Parser
 

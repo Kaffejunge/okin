@@ -262,7 +262,14 @@ class RateEquation():
         if path:
             preview(self.final_rate_law, viewer="file", filename=path)
         else:
-            preview(self.final_rate_law)
+            try:
+                preview(self.final_rate_law)
+            except RuntimeError:
+                pass
+            print("________________")
+            print(self.final_rate_law)
+            print("________________")
+
 
     def __repr__(self):
         return str(self.final_rate_law)

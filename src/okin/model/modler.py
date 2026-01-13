@@ -30,7 +30,7 @@ from itertools import product
 class Modler():
     """
     self.df_dict is a list of dfs. each df represents one experiment and has to contain the same headers.
-    self.copasi_settings is one large dict with all default values used in COPASI modeling
+    self.copasi_settings is one large dict with all default values used in COPASI modeling. It is loaded and written as a JSON!
     self.parameters is a dict(dict) with keys being the parameters to be optimized {"k1": {"bounds": (lower_bound, upper_bound), "definition": kN2*5, "best_guess": value}}
 
     self.current_mechanism is an updated mechanism that is going to be modeled next.
@@ -222,11 +222,6 @@ class Modler():
         sb_string_path = os.path.join(self.COPASI_INPUT_PATH, "sb_string.txt")
 
 
-        #! this is intentionally stupid
-        with open(r"D:\python_code\hein_modules\hein_chem_apply\fix_re_add_model\sb_string_true.txt", "r") as f:
-            sb_string = f.read()
-
-
         with open(sb_string_path, "w") as sbf:
             # print(f"COPASI from Sb string:\n{self.sb_string}")
             sbf.write(sb_string)
@@ -235,9 +230,12 @@ class Modler():
     def _write_copasi_settings(self):
         curr_settings_path = os.path.join(self.COPASI_INPUT_PATH, "user_settings.txt")
         # self.logger.info(f"Settings file = {curr_settings_path}")
-    
+
+
+
         with open(curr_settings_path, "w") as f:
-            f.write(str(self.copasi_settings))
+            json.dump(self.copasi_settings, f, indent=4)
+            # f.write(str(self.copasi_settings))
         
 
     def _start_copasi(self):
@@ -293,7 +291,7 @@ class Modler():
             rcts = [TEReaction(reaction_string=rct, id_=i+1) for i, rct in enumerate(m["reactions"])]
             self.models[name] = {"reactions": rcts, "k_dict": m["k_dict"]}
 
-        self.logger.info(f"Set models to:")
+        self.logger.info("Set models to:")
         for name, m in self.models.items():
             self.logger.info(f"{name}: {m}")
 
@@ -351,10 +349,8 @@ class Modler():
         """
         # print(new_settings)
         for k,v in new_settings.items():
-
             if k not in self.copasi_settings.keys():
                 raise ValueError(f"{k} is not a valid key. Only valid keys are: {self.copasi_settings.keys()}")
-            
             self.copasi_settings[k] = v
 
     def set_fixed_k_values(self, fixed_k_dict):
@@ -834,28 +830,31 @@ if __name__ == "__main__":
 
     # _______________________________________________________________________________________
 
-    m = Modler(copasi_path=r"D:\python_code\hein_modules\local_copasi")
+    # m = Modler(copasi_path=r"D:\python_code\hein_modules\local_copasi")
 
 
-    rcts = [
-        "A + cat -> cat1",
-        "cat1 + B -> P + cat",
-        "P + cat -> cat2"
-        ]
+    # rcts = [
+    #     "A + cat -> cat1",
+    #     "cat1 + B -> P + cat",
+    #     "P + cat -> cat2"
+    #     ]
 
-    # df = pd.read_csv(r"D:\python_code\hein_modules\hein_chem_apply\fix_re_add_model\re_add_data.csv")
-    # print(df)
-    # input()
-    # m.set_models(models=models)
-    m.set_m_reactions(mechanism=rcts)
-    m.add_experiment_csv(csv_paths=[r"D:\python_code\hein_modules\hein_chem_apply\fix_re_add_model\re_add_data.csv"])
-    m.set_species_for_model(species=["P", "A"])
-    m.set_species_to_match(species=["P", "A", "B"])
-    # m.set_manual_sb_edit(manual_sb_edit=True)
-    m.create_single_model()
+    print("Modeling:\n______________________________")
+    # local_copasi_path = r"D:\python_code\hein_modules\py_copasi"
+    local_copasi_path = r"D:\python_code\hein_modules\testing_stuff\py_copasi"
+    modler = Modler(copasi_path=local_copasi_path)
 
-    m.show_model_fit(save_modeled_data=True, show_all=True)
+    my_mechanism_guess = [ 
+        "A + cat -> cat + P",
+        ] 
 
+    modler.set_m_reactions(mechanism=my_mechanism_guess)
+    modler.add_experiment_csv(csv_paths=[r"D:\python_code\hein_modules\simulated_test_csvs\data1.csv", r"D:\python_code\hein_modules\simulated_test_csvs\data2.csv"])
+    modler.set_species_for_model(species=["P", "A"])
+    modler.set_species_to_match(species=["P", "A"])
+    modler.set_copasi_settings(new_settings={"number_of_generations":50, "population_size": 50})
+    modler.create_single_model()
+    modler.show_model_fit(save_modeled_data=True, show_all=True)
 
 
     # m = Modler()
