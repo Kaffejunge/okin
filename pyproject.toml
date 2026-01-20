@@ -9,8 +9,10 @@ description = "Organic-Kinetics (okin) is a collection of chemistry-related Pyth
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
-  { name = "Finn Bork" }
+  { name = "Finn Bork" },
+  { name = "Dylan Pyle"}
 ]
+
 dependencies = [
   "matplotlib",
   "mendeleev",
@@ -19,7 +21,7 @@ dependencies = [
   "scikit-learn",
   "sympy",
   "tellurium",
-  "numpy==1.26.4",
+  "numpy==1.26.4"
 ]
 
 [project.urls]

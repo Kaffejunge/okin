@@ -78,13 +78,11 @@ class Modler():
     def create_paths(self):
         # current_folder = f"{os.path.dirname(os.path.abspath(__file__))}" # this is nuts.
         # self.COPASI_PATH = f"{current_folder}\\local_copasi"
-        self.COPASI_BASE_PATH = f"{self.COPASI_PATH}\\temp"
-        self.COPASI_INPUT_PATH = f"{self.COPASI_PATH}\\temp\\input"
-        self.COPASI_OUTPUT_PATH = f"{self.COPASI_PATH}\\temp\\kopt\\Fit1\\results\\curr_run" # copasi demands this structure
-        self.COPASI_DEFAULT_PATH = f"{self.COPASI_PATH}\\default"      
-        
-        self.logger.info(f"{self.COPASI_INPUT_PATH = }")
-    
+        self.COPASI_BASE_PATH = os.path.join(self.COPASI_PATH, "temp")
+        self.COPASI_INPUT_PATH = os.path.join(self.COPASI_BASE_PATH, "input")
+        self.COPASI_OUTPUT_PATH = os.path.join(self.COPASI_BASE_PATH, "kopt", "Fit1", "results", "curr_run") # copasi demands this structure
+        self.COPASI_DEFAULT_PATH = os.path.join(self.COPASI_PATH, "default")
+
     #*___________________________________________________________________________________________________________________
     #*                                        **helper functions**
 
@@ -260,6 +258,7 @@ class Modler():
         return round(val, rounding_digit)
 
     def _read_results(self):
+        print(f"{self.COPASI_OUTPUT_PATH = }")
         paths_to_ks = glob.glob(self.COPASI_OUTPUT_PATH + "\*.txt")
         
         dfs = []

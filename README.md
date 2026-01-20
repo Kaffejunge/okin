@@ -71,21 +71,21 @@ rate_eq.show_latex_rate_law()
 
 Okin allows you to simulate chemical reaction kinetics over time with specified rate constants and initial concentrations.
 
-**Example:**
+#### **Fixed Simulation**
 
 ```python
 from okin.simulation.simulator import Simulator
 import matplotlib.pyplot as plt
 from okin.base.chem_plot_utils import apply_acs_layout
 
-# Define reactions, rate constants, and initial concentrations
-reactions = ["A + cat -> cat1", "cat1 + B -> cat + P", "X + cat -> cat_deact"]
+# Define mechanism, rate constants, and initial concentrations
+mechanism = ["A + cat -> cat1", "cat1 + B -> cat + P", "X + cat -> cat_deact"]
 k_dict = {"k1": 10, "kN1": 5, "k2": 3, "kN2": 0, "k3": 0.005, "kN3": 0}
 c_dict = {"A": 1.0, "B": 1.2, "cat": 0.05, "P": 0.0, "X": 0.1}
 
 # Setup and run simulation
 sim = Simulator()
-sim.setup(reactions, k_dict, c_dict)
+sim.setup(mechanism, k_dict, c_dict)
 sim.simulate(start=0, stop=80, nr_time_points=40)
 
 # Access results
@@ -101,10 +101,58 @@ apply_acs_layout()
 plt.show()
 ```
 
-- `setup()` takes reactions as strings, rate constants (`k_dict`), and initial concentrations (`c_dict`).  
+- `setup()` takes mechanism as strings, rate constants (`k_dict`), and initial concentrations (`c_dict`).  
 - `simulate()` runs the time evolution over a specified range with a given number of points.  
 - Results are stored in `sim.result` as a DataFrame for plotting or further analysis.
 - Reversibility is determined by k-values and not by arrows.
+
+
+
+#### **Interactive Simulation**
+
+```python
+from okin.simulation.tc_engine import InteractiveTimeCourse
+
+mechanism = [
+    "A + cat = cat1",
+    "cat1 + B = P + cat",
+    "cat1 + A  = catI"
+]
+initial_conditions = {
+    "A": 1.0, 
+    "B": 1.2,
+    "cat": 0.01
+}
+conserved_species = {
+    # Specify any conservation equations
+    # Example:
+    # 'E_free': 'E_total - ES'
+}
+k_init = {
+    "k1": 1,
+    "k2": 0,
+    "k3": 1,
+    "k4": 0,
+    "k5": 100,
+    "k6": 10
+}
+
+portrait = InteractiveTimeCourse(
+    mechanism, initial_conditions, conserved_species, k_init, mode="vtna")
+portrait.run()
+
+```
+
+- `mechanism` contains the elementary steps as strings
+- Reversible arrow: `=`: is highly recommended. Non-reversible arrow `->`: use with care 
+- `initial_conditions` are the starting concentrations. Species not mentioned here are set to 0.
+- `k_dict` contains the starting k-values. Range from 0-100 in steps of 0.1
+- `k1` (forward for rct1); `k2` (backwards for rct1); !different from fixed simulation which has `k1` and `kN1`!
+- `allowed_modes = ["vtna", "tc", "phase"]`. 
+- `"vtna"` shows time course, catalyst concentration and VTNA for doubled [cat]. Slower response time than other modes.
+- `"tc"` shows only the time course. Good for fast exploration.
+- `"phase"` shows customizable phase diagrams
+
 
 ### 4. VTNA (Variable Time Normalization Analysis)
 

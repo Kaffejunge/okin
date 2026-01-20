@@ -130,38 +130,13 @@ class Simulator():
         
 def main():
   
-    reactions = ["A+cat->cat1", "cat1+B->P + cat"]
-    k_dict = {"k1":0.3, "kN1":0.05, "k2":0.8, "kN2":0.1, "k3":1, "kN3":0}
+    reactions = ["A+cat->cat1", "cat1+B->P + cat", "cat1 + A -> catI"]
+    k_dict = {"k1":0.1, "kN1":0, "k2":0.1, "kN2":0, "k3":0, "kN3":0}
 
-    c_dict = {"A":1.0, "cat":0.05, "B":0.8, "cat1":0}
+    c_dict = {"A":1.0, "cat":0.01, "B":1.2, "cat1":0}
     sim = Simulator()
-    sb_string = """
-model pathway()
-
-
-    J1: A + cat -> P + cat; (k1*A*cat - kN1*P*cat)
-
-    
-
-    A = 10 
-    P = 0 
-    cat = 0.5 
-
-    k1 = 1.0
-    kN1 = 0.0
-
-    rct_vol = 20
-    start_vol = 10;
-    ratio = start_vol/rct_vol
-    at(time>=2): P=P*ratio;
-
-    rct_vol2 = 5
-    ratio2 = start_vol/rct_vol2
-    at (time>=4): P = P*ratio2
-end
-"""
-    # sim.setup(reactions=reactions, c_dict=c_dict, k_dict=k_dict)
-    sim.simulate(0, 5, 40, use_const_cat=False, selections=["A", "P"], sb_string=sb_string)
+    sim.setup(reactions=reactions, c_dict=c_dict, k_dict=k_dict)
+    sim.simulate(0, 100, 40, use_const_cat=False, selections=["A", "P"])
     sim.result["A"] = sim.result["A"] 
     sim.result["P"] = sim.result["P"]
     
@@ -169,7 +144,8 @@ end
     plt.scatter(sim.result["time"], sim.result["P"], label="P")
     plt.legend()
     plt.show()
-#   
+
+    
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

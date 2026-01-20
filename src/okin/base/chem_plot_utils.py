@@ -46,12 +46,12 @@ def apply_acs_layout_ax(ax):
             label.set_fontweight('bold')
 
         # Set figure size and DPI via the figure containing the ax
-        fig = ax.figure
+        # fig = ax.figure
         # fig.set_size_inches(9, 4)  # Specify width and height in inches
-        fig.set_dpi(100)  # Set resolution (dots per inch)
+        # fig.set_dpi(100)  # Set resolution (dots per inch)
 
         # Adjust subplot layout (this will modify the space around the plot)
-        plt.subplots_adjust(top=0.75, bottom=0.15, left=0.05, right=0.1)
+        # plt.subplots_adjust(top=0.75, bottom=0.15, left=0.05, right=0.1)
 
         # Tight layout to avoid overlapping elements
         # fig.tight_layout()
